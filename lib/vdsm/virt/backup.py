@@ -164,6 +164,8 @@ def start_backup(vm, dom, config):
             reason="Cannot start a backup without disks",
             backup=backup_cfg.backup_id)
 
+    _print_object(backup_cfg, "start_backup()::BackupConfig")
+
     backup_disks = _get_backup_disks(vm, backup_cfg)
     path = socket_path(backup_cfg.backup_id)
     nbd_addr = nbdutils.UnixAddress(path)
@@ -355,17 +357,40 @@ def _get_backup_disks(vm, backup_cfg):
 
 
 def _start_monitoring_scratch_disks(vm, backup_disks, backup):
+    log.info("_start_monitoring_scratch_disks called")
     disks = backup["disks"]
     for backup_disk in backup_disks.values():
         if backup_disk.scratch_disk.type == DISK_TYPE.BLOCK:
-            # TODO: Add domain, image, and volume ids when they are
-            # availble.
             scratch_disk = disks[backup_disk.drive.name]
             vm.log.info("Start monitoring scratch disk %s for drive %s",
                         scratch_disk, backup_disk.drive.name)
             backup_disk.drive.scratch_disk = {
-                "index": scratch_disk["index"],
+                "index": scratch_disk["index"]
             }
+            if backup_disk.scratch_disk.sd_id is not None:
+                backup_disk.drive.scratch_disk["sd_id"] =\
+                    backup_disk.scratch_disk.sd_id
+            if backup_disk.scratch_disk.img_id is not None:
+                backup_disk.drive.scratch_disk["img_id"] =\
+                    backup_disk.scratch_disk.img_id
+            if backup_disk.scratch_disk.vol_id is not None:
+                backup_disk.drive.scratch_disk["vol_id"] =\
+                    backup_disk.scratch_disk.vol_id
+        else:
+            scratch_disk = disks[backup_disk.drive.name]
+            my_dict = {
+                "index": scratch_disk["index"]
+            }
+            if backup_disk.scratch_disk.sd_id is not None:
+                my_dict["sd_id"] =\
+                    backup_disk.scratch_disk.sd_id
+            if backup_disk.scratch_disk.img_id is not None:
+                my_dict["img_id"] =\
+                    backup_disk.scratch_disk.img_id
+            if backup_disk.scratch_disk.vol_id is not None:
+                my_dict["vol_id"] =\
+                    backup_disk.scratch_disk.vol_id
+            _print_object(my_dict, "_start_monitoring_scratch_disks::my_dict")
 
 
 def _stop_monitoring_scratch_disks(vm):
@@ -725,3 +750,11 @@ def _create_transient_disk(vm, dom, backup_id, drive):
             backup_id=backup_id,
             drive_name=drive.name)
     return res['result']['path']
+
+
+def _print_object(obj, message):
+    import jsonpickle
+    import json
+
+    serialized = jsonpickle.encode(obj)
+    log.info("%s: %s", message, json.dumps(json.loads(serialized), indent=2))
